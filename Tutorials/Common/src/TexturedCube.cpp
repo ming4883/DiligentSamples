@@ -261,16 +261,24 @@ RefCntAutoPtr<IPipelineState> CreatePipelineState(const CreatePSOInfo& CreateInf
     // Define variable type that will be used by default
     ResourceLayout.DefaultVariableType = SHADER_RESOURCE_VARIABLE_TYPE_STATIC;
 
-    // Shader variables should typically be mutable, which means they are expected
-    // to change on a per-instance basis
-    // clang-format off
-    ShaderResourceVariableDesc Vars[] = 
+    if (CreateInfo.ShaderVarCount && CreateInfo.ShaderVars)
     {
-        {SHADER_TYPE_PIXEL, "g_Texture", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE}
-    };
-    // clang-format on
-    ResourceLayout.Variables    = Vars;
-    ResourceLayout.NumVariables = _countof(Vars);
+        ResourceLayout.Variables    = CreateInfo.ShaderVars;
+        ResourceLayout.NumVariables = CreateInfo.ShaderVarCount;
+    }
+    else
+    {
+        // Shader variables should typically be mutable, which means they are expected
+        // to change on a per-instance basis
+        // clang-format off
+        ShaderResourceVariableDesc Vars[] =
+        {
+            {SHADER_TYPE_PIXEL, "g_Texture", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
+        };
+        // clang-format on
+        ResourceLayout.Variables    = Vars;
+        ResourceLayout.NumVariables = _countof(Vars);
+    }
 
     // Define immutable sampler for g_Texture. Immutable samplers should be used whenever possible
     // clang-format off

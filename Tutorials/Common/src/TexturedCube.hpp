@@ -79,6 +79,8 @@ struct CreatePSOInfo
     LayoutElement*                   ExtraLayoutElements    = nullptr;
     Uint32                           NumExtraLayoutElements = 0;
     Uint8                            SampleCount            = 1;
+    ShaderResourceVariableDesc*      ShaderVars             = nullptr;
+    Uint32                           ShaderVarCount         = 0;
 };
 RefCntAutoPtr<IPipelineState> CreatePipelineState(const CreatePSOInfo& CreateInfo);
 
