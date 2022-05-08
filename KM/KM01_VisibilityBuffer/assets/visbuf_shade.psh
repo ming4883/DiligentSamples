@@ -32,5 +32,21 @@ void main(in  PSInput  PSIn,
     float2 UV = PSIn.UV;
 #endif
 
-    PSOut.Color = g_IdTexture.Sample(g_IdTexture_sampler, UV);
+    uint4 Encoded = uint4(g_IdTexture.Sample(g_IdTexture_sampler, UV) * 255);
+    uint PrimId = Encoded.r | (Encoded.g << 8) | (Encoded.b << 16) | (Encoded.a << 24);
+
+    if (PrimId == 0xffffffff)
+    {
+        PSOut.Color = 1;
+    }
+    else
+    {
+        uint InstId   = (PrimId >> 16) & 0xffff;
+        uint VertId   = PrimId & 0xffff;
+        uint TriId    = VertId / 3;
+        PSOut.Color.r = ((InstId % 4) + 1) / 4.0;
+        PSOut.Color.g = ((TriId % 2) + 1) / 2.0;
+        PSOut.Color.b = 0;
+        PSOut.Color.a = 1;
+    }
 }

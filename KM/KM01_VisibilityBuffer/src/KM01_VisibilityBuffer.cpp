@@ -237,7 +237,7 @@ void KM01_VisibilityBuffer::CreateVisBufShadePSO()
     // Define immutable sampler for g_Texture. Immutable samplers should be used whenever possible
     ImmutableSamplerDesc ImtblSamplers[] =
     {
-        { SHADER_TYPE_PIXEL, "g_IdTexture", Sam_LinearClamp }
+        { SHADER_TYPE_PIXEL, "g_IdTexture", Sam_PointClamp }
     };
     // clang-format on
     PSOCreateInfo.PSODesc.ResourceLayout.ImmutableSamplers    = ImtblSamplers;
@@ -442,7 +442,8 @@ void KM01_VisibilityBuffer::Update(double CurrTime, double ElapsedTime)
     m_ViewProjMatrix = View * SrfPreTransform * Proj;
 
     // Global rotation matrix
-    m_RotationMatrix = float4x4::RotationY(static_cast<float>(CurrTime) * 1.0f) * float4x4::RotationX(-static_cast<float>(CurrTime) * 0.25f);
+    const auto AnimTime = CurrTime * 0.125;
+    m_RotationMatrix = float4x4::RotationY(static_cast<float>(AnimTime) * 1.0f) * float4x4::RotationX(-static_cast<float>(AnimTime) * 0.25f);
 }
 
 } // namespace Diligent
