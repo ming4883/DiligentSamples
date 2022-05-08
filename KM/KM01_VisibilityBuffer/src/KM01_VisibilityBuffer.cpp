@@ -102,24 +102,6 @@ void KM01_VisibilityBuffer::VisibilityBuffer::Create(IRenderDevice* pDevice, std
 
 void KM01_VisibilityBuffer::CreateCubePSO()
 {
-    // clang-format off
-    // Define vertex shader input layout
-    // This tutorial uses two types of input: per-vertex data and per-instance data.
-    LayoutElement LayoutElems[] =
-    {
-        // Per-instance data - second buffer slot
-        // We will use four attributes to encode instance-specific 4x4 transformation matrix
-        // Attribute 2 - first row
-        LayoutElement{0, 0, 4, VT_FLOAT32, False, INPUT_ELEMENT_FREQUENCY_PER_INSTANCE},
-        // Attribute 3 - second row
-        LayoutElement{1, 0, 4, VT_FLOAT32, False, INPUT_ELEMENT_FREQUENCY_PER_INSTANCE},
-        // Attribute 4 - third row
-        LayoutElement{2, 0, 4, VT_FLOAT32, False, INPUT_ELEMENT_FREQUENCY_PER_INSTANCE},
-        // Attribute 5 - fourth row
-        LayoutElement{3, 0, 4, VT_FLOAT32, False, INPUT_ELEMENT_FREQUENCY_PER_INSTANCE}
-    };
-    // clang-format on
-
     // Create a shader source stream factory to load shaders from files.
     RefCntAutoPtr<IShaderSourceInputStreamFactory> pShaderSourceFactory;
     m_pEngineFactory->CreateDefaultShaderSourceStreamFactory(nullptr, &pShaderSourceFactory);
@@ -131,8 +113,8 @@ void KM01_VisibilityBuffer::CreateCubePSO()
     CubePsoCI.pShaderSourceFactory   = pShaderSourceFactory;
     CubePsoCI.VSFilePath             = "visbuf_cube.vsh";
     CubePsoCI.PSFilePath             = "visbuf_cube.psh";
-    CubePsoCI.ExtraLayoutElements    = LayoutElems;
-    CubePsoCI.NumExtraLayoutElements = _countof(LayoutElems);
+    CubePsoCI.ExtraLayoutElements    = nullptr;;
+    CubePsoCI.NumExtraLayoutElements = 0;
 
     // Fetch vertex manually in vertex shader
     // clang-format off
@@ -141,6 +123,7 @@ void KM01_VisibilityBuffer::CreateCubePSO()
     {SHADER_TYPE_PIXEL, "g_Texture", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
     {SHADER_TYPE_VERTEX, "g_VertexData", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
     {SHADER_TYPE_VERTEX, "g_IndexData", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
+    {SHADER_TYPE_VERTEX, "g_InstanceData", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
     };
     // clang-format on
     CubePsoCI.ShaderVars = Vars;
@@ -277,8 +260,10 @@ void KM01_VisibilityBuffer::CreateInstanceBuffer()
     InstBuffDesc.Name = "Instance data buffer";
     // Use default usage as this buffer will only be updated when grid size changes
     InstBuffDesc.Usage     = USAGE_DEFAULT;
-    InstBuffDesc.BindFlags = BIND_VERTEX_BUFFER;
+    InstBuffDesc.BindFlags = BIND_SHADER_RESOURCE;
+    InstBuffDesc.Mode      = BUFFER_MODE_STRUCTURED;
     InstBuffDesc.Size      = sizeof(float4x4) * MaxInstances;
+    InstBuffDesc.ElementByteStride = sizeof(float4);
     m_pDevice->CreateBuffer(InstBuffDesc, nullptr, &m_InstanceBuffer);
     PopulateInstanceBuffer();
 }
@@ -313,6 +298,7 @@ void KM01_VisibilityBuffer::Initialize(const SampleInitInfo& InitInfo)
     m_CubeSRB->GetVariableByName(SHADER_TYPE_PIXEL, "g_Texture")->Set(m_TextureSRV);
     m_CubeSRB->GetVariableByName(SHADER_TYPE_VERTEX, "g_VertexData")->Set(m_CubeVertexBuffer->GetDefaultView(BUFFER_VIEW_SHADER_RESOURCE));
     m_CubeSRB->GetVariableByName(SHADER_TYPE_VERTEX, "g_IndexData")->Set(m_CubeIndexBuffer->GetDefaultView(BUFFER_VIEW_SHADER_RESOURCE));
+    m_CubeSRB->GetVariableByName(SHADER_TYPE_VERTEX, "g_InstanceData")->Set(m_InstanceBuffer->GetDefaultView(BUFFER_VIEW_SHADER_RESOURCE));
 
 }
 
@@ -380,8 +366,6 @@ void KM01_VisibilityBuffer::PopulateInstanceBuffer()
 // Render a frame
 void KM01_VisibilityBuffer::Render()
 {
-    //auto* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
-    //auto* pDSV = m_pSwapChain->GetDepthBufferDSV();
     assert(m_MainVisBuf);
 
     {
@@ -401,11 +385,8 @@ void KM01_VisibilityBuffer::Render()
             CBConstants[1] = m_RotationMatrix.Transpose();
         }
 
-        // Bind vertex, instance and index buffers
-        const Uint64 offsets[] = {0, 0};
-        IBuffer*     pBuffs[]  = {m_InstanceBuffer};
-        m_pImmediateContext->SetVertexBuffers(0, _countof(pBuffs), pBuffs, offsets, RESOURCE_STATE_TRANSITION_MODE_TRANSITION, SET_VERTEX_BUFFERS_FLAG_RESET);
-        //m_pImmediateContext->SetIndexBuffer(m_CubeIndexBuffer, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+        // No need to bind vertex, instance and index buffers, since we are fetching them in shader
+
 
         // Set the pipeline state
         m_pImmediateContext->SetPipelineState(m_pCubePSO);
