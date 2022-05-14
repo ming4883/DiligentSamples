@@ -223,6 +223,7 @@ void KM01_VisibilityBuffer::CreateVisBufShadePSO()
     {SHADER_TYPE_PIXEL, "Constants", SHADER_RESOURCE_VARIABLE_TYPE_STATIC},
     {SHADER_TYPE_PIXEL, "g_CachedVertexData", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
     {SHADER_TYPE_PIXEL, "g_IdTexture", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
+    {SHADER_TYPE_PIXEL, "g_Texture", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
     };
     // clang-format on
     PSOCreateInfo.PSODesc.ResourceLayout.Variables    = Vars;
@@ -232,7 +233,8 @@ void KM01_VisibilityBuffer::CreateVisBufShadePSO()
     // Define immutable sampler for g_Texture. Immutable samplers should be used whenever possible
     ImmutableSamplerDesc ImtblSamplers[] =
     {
-    { SHADER_TYPE_PIXEL, "g_IdTexture", Sam_PointClamp }
+    { SHADER_TYPE_PIXEL, "g_IdTexture", Sam_PointClamp },
+    { SHADER_TYPE_PIXEL, "g_Texture", Sam_LinearClamp },
     };
     // clang-format on
     PSOCreateInfo.PSODesc.ResourceLayout.ImmutableSamplers    = ImtblSamplers;
@@ -376,6 +378,7 @@ void KM01_VisibilityBuffer::Initialize(const SampleInitInfo& InitInfo)
     m_PipelineCube.pSRB->GetVariableByName(SHADER_TYPE_VERTEX, "g_CachedVertexData")->Set(m_VertexCacheBuffer->GetDefaultView(BUFFER_VIEW_SHADER_RESOURCE));
 
     m_PipelineVisBufShade.pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "g_CachedVertexData")->Set(m_VertexCacheBuffer->GetDefaultView(BUFFER_VIEW_SHADER_RESOURCE));
+    m_PipelineVisBufShade.pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "g_Texture")->Set(m_TextureSRV);
 
     m_PipelineVisBufVertexCache.pSRB->GetVariableByName(SHADER_TYPE_COMPUTE, "g_VertexData")->Set(m_CubeVertexBuffer->GetDefaultView(BUFFER_VIEW_SHADER_RESOURCE));
     m_PipelineVisBufVertexCache.pSRB->GetVariableByName(SHADER_TYPE_COMPUTE, "g_IndexData")->Set(m_CubeIndexBuffer->GetDefaultView(BUFFER_VIEW_SHADER_RESOURCE));

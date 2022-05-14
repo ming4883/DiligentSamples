@@ -11,6 +11,9 @@ cbuffer Constants
 Texture2D    g_IdTexture;
 SamplerState g_IdTexture_sampler; // By convention, texture samplers must use the '_sampler' suffix
 
+Texture2D    g_Texture;
+SamplerState g_Texture_sampler; // By convention, texture samplers must use the '_sampler' suffix
+
 struct PSInput
 {
     float4 Pos   : SV_POSITION;
@@ -42,17 +45,17 @@ void main(in  PSInput  PSIn,
     // of the top left. When sampling a regular texture, there is no visible difference since the texture data
     // is also uploaded starting from that lower-left corner. When sampling a framebuffer attachment, there is
     // a visible difference, though. Hence we need to flip the Y coordinate of the frame buffer attachment.
-    float2 UV = float2(PSIn.UV.x, 1.0 - PSIn.UV.y);
+    float2 IdTexUV = float2(PSIn.UV.x, 1.0 - PSIn.UV.y);
 #else
-    float2 UV = PSIn.UV;
+    float2 IdTexUV = PSIn.UV;
 #endif
 
-    uint4 Encoded = uint4(g_IdTexture.Sample(g_IdTexture_sampler, UV) * 255);
+    uint4 Encoded = uint4(g_IdTexture.Sample(g_IdTexture_sampler, IdTexUV) * 255);
     uint PrimId = Encoded.r | (Encoded.g << 8) | (Encoded.b << 16) | (Encoded.a << 24);
 
     if (PrimId == 0xffffffff)
     {
-        PSOut.Color = 1;
+        PSOut.Color = float4(0.5, 0.5, 0.5, 1.0);
     }
     else
     {
@@ -67,11 +70,16 @@ void main(in  PSInput  PSIn,
         Cached[2] = g_CachedVertexData[BufferOffset+2];
 
         float2 Vert[3];
+        float2 Texcoord[3];
 
         // unpack SvPos
         UnpackFloat(Cached[0].PosDepthNormalUV.x, Vert[0].x, Vert[0].y);
         UnpackFloat(Cached[1].PosDepthNormalUV.x, Vert[1].x, Vert[1].y);
         UnpackFloat(Cached[2].PosDepthNormalUV.x, Vert[2].x, Vert[2].y);
+
+        UnpackFloat(Cached[0].PosDepthNormalUV.w, Texcoord[0].x, Texcoord[0].y);
+        UnpackFloat(Cached[1].PosDepthNormalUV.w, Texcoord[1].x, Texcoord[1].y);
+        UnpackFloat(Cached[2].PosDepthNormalUV.w, Texcoord[2].x, Texcoord[2].y);
 
         float2 HPos = (PSIn.Pos.xy - 0.5) * g_Constants.ScreenSizeInvSize.zw; // normalize
         HPos = HPos * float2(2.0, -2.0) + float2(-1.0, 1.0); // flip y axis
@@ -79,6 +87,8 @@ void main(in  PSInput  PSIn,
         float3 Bary;
         Barycentric(HPos, Vert[0], Vert[1], Vert[2], Bary);
 
-        PSOut.Color = float4(Bary, 1);
+        float2 UV = Texcoord[0] * Bary[0] + Texcoord[1] * Bary[1] + Texcoord[2] * Bary[2];
+
+        PSOut.Color = g_Texture.SampleLevel(g_Texture_sampler, UV, 0);
     }
 }
