@@ -41,5 +41,6 @@ void main(in  VSInput VSIn,
     // unpack UV
     UnpackFloat(Cached.PosDepthNormalUV.w, PSIn.UV.x, PSIn.UV.y);
 
-    PSIn.Id     = ((VSIn.InstId & 0xffff) << 16) | (VSIn.VertId & 0xffff);
+    uint TriId  = VSIn.VertId / 3;
+    PSIn.Id     = ((VSIn.InstId & 0xffff) << 16) | (TriId & 0xffff);
 }

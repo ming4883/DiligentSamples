@@ -220,7 +220,9 @@ void KM01_VisibilityBuffer::CreateVisBufShadePSO()
     // to change on a per-instance basis
     ShaderResourceVariableDesc Vars[] =
     {
-        { SHADER_TYPE_PIXEL, "g_IdTexture", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE }
+    {SHADER_TYPE_PIXEL, "Constants", SHADER_RESOURCE_VARIABLE_TYPE_STATIC},
+    {SHADER_TYPE_PIXEL, "g_CachedVertexData", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
+    {SHADER_TYPE_PIXEL, "g_IdTexture", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
     };
     // clang-format on
     PSOCreateInfo.PSODesc.ResourceLayout.Variables    = Vars;
@@ -230,13 +232,18 @@ void KM01_VisibilityBuffer::CreateVisBufShadePSO()
     // Define immutable sampler for g_Texture. Immutable samplers should be used whenever possible
     ImmutableSamplerDesc ImtblSamplers[] =
     {
-        { SHADER_TYPE_PIXEL, "g_IdTexture", Sam_PointClamp }
+    { SHADER_TYPE_PIXEL, "g_IdTexture", Sam_PointClamp }
     };
     // clang-format on
     PSOCreateInfo.PSODesc.ResourceLayout.ImmutableSamplers    = ImtblSamplers;
     PSOCreateInfo.PSODesc.ResourceLayout.NumImmutableSamplers = _countof(ImtblSamplers);
 
     m_pDevice->CreateGraphicsPipelineState(PSOCreateInfo, &m_PipelineVisBufShade.pPSO);
+
+    // Since we did not explcitly specify the type for 'Constants' variable, default
+    // type (SHADER_RESOURCE_VARIABLE_TYPE_STATIC) will be used. Static variables
+    // never change and are bound directly to the pipeline state object.
+    m_PipelineVisBufShade.pPSO->GetStaticVariableByName(SHADER_TYPE_PIXEL, "Constants")->Set(m_GlobalConstants);
 
     m_PipelineVisBufShade.pPSO->CreateShaderResourceBinding(&m_PipelineVisBufShade.pSRB, true);
 }
@@ -368,6 +375,8 @@ void KM01_VisibilityBuffer::Initialize(const SampleInitInfo& InitInfo)
     // Set cube vertex, index and instance SRV
     m_PipelineCube.pSRB->GetVariableByName(SHADER_TYPE_VERTEX, "g_CachedVertexData")->Set(m_VertexCacheBuffer->GetDefaultView(BUFFER_VIEW_SHADER_RESOURCE));
 
+    m_PipelineVisBufShade.pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "g_CachedVertexData")->Set(m_VertexCacheBuffer->GetDefaultView(BUFFER_VIEW_SHADER_RESOURCE));
+
     m_PipelineVisBufVertexCache.pSRB->GetVariableByName(SHADER_TYPE_COMPUTE, "g_VertexData")->Set(m_CubeVertexBuffer->GetDefaultView(BUFFER_VIEW_SHADER_RESOURCE));
     m_PipelineVisBufVertexCache.pSRB->GetVariableByName(SHADER_TYPE_COMPUTE, "g_IndexData")->Set(m_CubeIndexBuffer->GetDefaultView(BUFFER_VIEW_SHADER_RESOURCE));
     m_PipelineVisBufVertexCache.pSRB->GetVariableByName(SHADER_TYPE_COMPUTE, "g_InstanceData")->Set(m_InstanceBuffer->GetDefaultView(BUFFER_VIEW_SHADER_RESOURCE));
@@ -447,9 +456,12 @@ void KM01_VisibilityBuffer::Render()
 
     // Update Global Constants
     {
+        float ScreenX = (float)m_pSwapChain->GetDesc().Width;
+        float ScreenY = (float)m_pSwapChain->GetDesc().Height;
         MapHelper<GlobalConstants> CBConstants(m_pImmediateContext, m_GlobalConstants, MAP_WRITE, MAP_FLAG_DISCARD);
         CBConstants[0].ViewProj = m_ViewProjMatrix.Transpose();
         CBConstants[0].Rotation = m_RotationMatrix.Transpose();
+        CBConstants[0].ScreenSizeInvSize = float4(ScreenX, ScreenY, 1.0f / ScreenX, 1.0f / ScreenY);
         CBConstants[0].MeshDrawInfo = uint4(CUBE_VERTEX_COUNT, CUBE_INSTANCE_COUNT, 0, 0) ;
     }
 
