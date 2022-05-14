@@ -12,7 +12,7 @@ set(INCLUDE
     ../../Tutorials/Common/src/TexturedCube.hpp
 )
 
-file(GLOB SHADER_FILES assets/*.vsh assets/*.psh)
+file(GLOB SHADER_FILES assets/*.vsh assets/*.psh assets/*.csh assets/*.fxh)
 
 set(SHADERS
     ${SHADER_FILES}

@@ -36,6 +36,11 @@ namespace Diligent
 class KM01_VisibilityBuffer final : public SampleBase
 {
 public:
+    enum {
+        MAX_GRID_SIZE = 32,
+        MAX_VERTEX_COUNT = 36,
+        DISPATCH_THREAD_GROUP_SIZE = 32,
+    };
     virtual void Initialize(const SampleInitInfo& InitInfo) override final;
 
     virtual void ModifyEngineInitInfo(const ModifyEngineInitInfoAttribs& Attribs) override final;
@@ -64,20 +69,28 @@ private:
 
     void CreateCubePSO();
     void CreateVisBufShadePSO();
+    void CreateVisBufVertexCachePSO();
     void CreateInstanceBuffer();
+    void CreateVertexCacheBuffer();
     void UpdateUI();
     void PopulateInstanceBuffer();
 
+    struct Pipeline
+    {
+        RefCntAutoPtr<IPipelineState> pPSO;
+        RefCntAutoPtr<IShaderResourceBinding> pSRB;
+    };
 
-    RefCntAutoPtr<IPipelineState>         m_pCubePSO;
-    RefCntAutoPtr<IPipelineState>         m_pVisBufShadePSO;
+    Pipeline m_PipelineCube;
+    Pipeline m_PipelineVisBufShade;
+    Pipeline m_PipelineVisBufVertexCache;
+
+    RefCntAutoPtr<IBuffer>                m_GlobalConstants;
     RefCntAutoPtr<IBuffer>                m_CubeVertexBuffer;
     RefCntAutoPtr<IBuffer>                m_CubeIndexBuffer;
     RefCntAutoPtr<IBuffer>                m_InstanceBuffer;
-    RefCntAutoPtr<IBuffer>                m_VSConstants;
+    RefCntAutoPtr<IBuffer>                m_VertexCacheBuffer;
     RefCntAutoPtr<ITextureView>           m_TextureSRV;
-    RefCntAutoPtr<IShaderResourceBinding> m_CubeSRB;
-    RefCntAutoPtr<IShaderResourceBinding> m_VisBufShadeSRB;
 
     std::shared_ptr<VisibilityBuffer>     m_MainVisBuf;
 
