@@ -38,15 +38,18 @@ void main(uint3 DTid : SV_DispatchThreadID)
     float4x4 InstanceMatr = MatrixFromRows(g_InstanceData[InstOffset].RowData, g_InstanceData[InstOffset+1].RowData, g_InstanceData[InstOffset+2].RowData, g_InstanceData[InstOffset+3].RowData);
     // Apply rotation
     float4 TransformedPos = mul(float4(VtxData.Pos,1.0), g_Constants.Rotation);
+    float4 TransformedNrm = mul(float4(VtxData.Normal,0.0), g_Constants.Rotation);
     // Apply instance-specific transformation
     TransformedPos = mul(TransformedPos, InstanceMatr);
+    TransformedNrm = mul(float4(TransformedNrm.xyz, 0), InstanceMatr);
     // Apply view-projection matrix
     float4 SvPos = mul(TransformedPos, g_Constants.ViewProj);
     SvPos.xyz /= SvPos.www;
+    float2 OctNrm = UnitVectorToOctahedron(normalize(TransformedNrm.xyz));
     CachedMeshVertex Cached;
     Cached.PosDepthNormalUV.x = PackFloats(SvPos.x, SvPos.y);
     Cached.PosDepthNormalUV.y = SvPos.z;
-    Cached.PosDepthNormalUV.z = PackFloats(0.0, 0.0);
+    Cached.PosDepthNormalUV.z = PackFloats(OctNrm.x, OctNrm.y);
     Cached.PosDepthNormalUV.w = PackFloats(VtxData.UV.x, VtxData.UV.y);
 
     g_CachedVertexData[DispatchId] = Cached;

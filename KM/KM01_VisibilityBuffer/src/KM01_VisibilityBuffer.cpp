@@ -247,7 +247,7 @@ void KM01_VisibilityBuffer::CreateVisBufShadePSO()
     // never change and are bound directly to the pipeline state object.
     m_PipelineVisBufShade.pPSO->GetStaticVariableByName(SHADER_TYPE_PIXEL, "Constants")->Set(m_GlobalConstants);
 
-    m_PipelineVisBufShade.pPSO->CreateShaderResourceBinding(&m_PipelineVisBufShade.pSRB, true);
+    m_PipelineVisBufShade.pPSO->CreateShaderResourceBinding(&m_PipelineVisBufShade.pSRB, true) ;
 }
 
 void KM01_VisibilityBuffer::CreateVisBufVertexCachePSO()
@@ -281,7 +281,7 @@ void KM01_VisibilityBuffer::CreateVisBufVertexCachePSO()
         m_pDevice->CreateShader(ShaderCI, &pCS);
     }
 
-    ComputePipelineStateCreateInfo PSOCreateInfo;
+    ComputePipelineStateCreateInfo PSOCreateInfo ;
     PipelineStateDesc&             PSODesc = PSOCreateInfo.PSODesc;
 
     PSODesc.PipelineType = PIPELINE_TYPE_COMPUTE;
@@ -443,7 +443,7 @@ void KM01_VisibilityBuffer::PopulateInstanceBuffer()
         }
     }
     // Update instance data buffer
-    Uint32 DataSize = static_cast<Uint32>(sizeof(InstanceData[0]) * InstanceData.size());
+    Uint32 DataSize = static_cast<Uint32>(sizeof(InstanceData[0]) * InstanceData.size()) ;
     m_pImmediateContext->UpdateBuffer(m_InstanceBuffer, 0, DataSize, InstanceData.data(), RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 }
 

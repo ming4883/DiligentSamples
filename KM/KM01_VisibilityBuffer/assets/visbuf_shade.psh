@@ -70,16 +70,23 @@ void main(in  PSInput  PSIn,
         Cached[2] = g_CachedVertexData[BufferOffset+2];
 
         float2 Vert[3];
+        float2 OctNrm[3];
         float2 Texcoord[3];
+
 
         // unpack SvPos
         UnpackFloat(Cached[0].PosDepthNormalUV.x, Vert[0].x, Vert[0].y);
         UnpackFloat(Cached[1].PosDepthNormalUV.x, Vert[1].x, Vert[1].y);
         UnpackFloat(Cached[2].PosDepthNormalUV.x, Vert[2].x, Vert[2].y);
 
+        UnpackFloat(Cached[0].PosDepthNormalUV.z, OctNrm[0].x, OctNrm[0].y);
+        UnpackFloat(Cached[1].PosDepthNormalUV.z, OctNrm[1].x, OctNrm[1].y);
+        UnpackFloat(Cached[2].PosDepthNormalUV.z, OctNrm[2].x, OctNrm[2].y);
+
         UnpackFloat(Cached[0].PosDepthNormalUV.w, Texcoord[0].x, Texcoord[0].y);
         UnpackFloat(Cached[1].PosDepthNormalUV.w, Texcoord[1].x, Texcoord[1].y);
         UnpackFloat(Cached[2].PosDepthNormalUV.w, Texcoord[2].x, Texcoord[2].y);
+
 
         float2 HPos = (PSIn.Pos.xy - 0.5) * g_Constants.ScreenSizeInvSize.zw; // normalize
         HPos = HPos * float2(2.0, -2.0) + float2(-1.0, 1.0); // flip y axis
@@ -89,6 +96,12 @@ void main(in  PSInput  PSIn,
 
         float2 UV = Texcoord[0] * Bary[0] + Texcoord[1] * Bary[1] + Texcoord[2] * Bary[2];
 
+        float3 Nrm = OctahedronToUnitVector(OctNrm[0]) * Bary[0] + OctahedronToUnitVector(OctNrm[1]) * Bary[1] + OctahedronToUnitVector(OctNrm[2]) * Bary[2];
+        Nrm = normalize(Nrm);
+
         PSOut.Color = g_Texture.SampleLevel(g_Texture_sampler, UV, 0);
+
+        float3 LightDir = float3(0, 1, 0);
+        PSOut.Color.xyz *= saturate(dot(Nrm, LightDir) * 0.5 + 0.5);
     }
 }
