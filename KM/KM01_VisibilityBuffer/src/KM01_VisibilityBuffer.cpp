@@ -98,7 +98,7 @@ void KM01_VisibilityBuffer::VisibilityBuffer::Create(IRenderDevice* pDevice, std
     TextureDesc RTDepthDesc = RTIdDesc;
     RTDepthDesc.Name        = "Visibility depth buffer";
     RTDepthDesc.Format      = GetDepthBufferFormat();
-    RTDepthDesc.BindFlags   = BIND_DEPTH_STENCIL;
+    RTDepthDesc.BindFlags   = BIND_SHADER_RESOURCE | BIND_DEPTH_STENCIL;
     // Define optimal clear value
     RTDepthDesc.ClearValue.Format               = RTDepthDesc.Format;
     RTDepthDesc.ClearValue.DepthStencil.Depth   = 1;
@@ -123,7 +123,7 @@ void KM01_VisibilityBuffer::CreateCubePSO()
     CubePsoCI.pShaderSourceFactory   = pShaderSourceFactory;
     CubePsoCI.VSFilePath             = "visbuf_cube.vsh";
     CubePsoCI.PSFilePath             = "visbuf_cube.psh";
-    CubePsoCI.ExtraLayoutElements    = nullptr;;
+    CubePsoCI.ExtraLayoutElements    = nullptr;
     CubePsoCI.NumExtraLayoutElements = 0;
 
     // Fetch vertex manually in vertex shader
@@ -223,6 +223,7 @@ void KM01_VisibilityBuffer::CreateVisBufShadePSO()
     {SHADER_TYPE_PIXEL, "Constants", SHADER_RESOURCE_VARIABLE_TYPE_STATIC},
     {SHADER_TYPE_PIXEL, "g_CachedVertexData", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
     {SHADER_TYPE_PIXEL, "g_IdTexture", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
+    {SHADER_TYPE_PIXEL, "g_DepthTexture", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
     {SHADER_TYPE_PIXEL, "g_Texture", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
     };
     // clang-format on
@@ -234,6 +235,7 @@ void KM01_VisibilityBuffer::CreateVisBufShadePSO()
     ImmutableSamplerDesc ImtblSamplers[] =
     {
     { SHADER_TYPE_PIXEL, "g_IdTexture", Sam_PointClamp },
+    { SHADER_TYPE_PIXEL, "g_DepthTexture", Sam_PointClamp },
     { SHADER_TYPE_PIXEL, "g_Texture", Sam_LinearClamp },
     };
     // clang-format on
@@ -247,7 +249,7 @@ void KM01_VisibilityBuffer::CreateVisBufShadePSO()
     // never change and are bound directly to the pipeline state object.
     m_PipelineVisBufShade.pPSO->GetStaticVariableByName(SHADER_TYPE_PIXEL, "Constants")->Set(m_GlobalConstants);
 
-    m_PipelineVisBufShade.pPSO->CreateShaderResourceBinding(&m_PipelineVisBufShade.pSRB, true) ;
+    m_PipelineVisBufShade.pPSO->CreateShaderResourceBinding(&m_PipelineVisBufShade.pSRB, true);
 }
 
 void KM01_VisibilityBuffer::CreateVisBufVertexCachePSO()
@@ -369,7 +371,7 @@ void KM01_VisibilityBuffer::Initialize(const SampleInitInfo& InitInfo)
     // Load textured cube
     m_CubeVertexBuffer = TexturedCube::CreateVertexBuffer(m_pDevice, TexturedCube::VERTEX_COMPONENT_FLAG_POS_NORM_UV, BIND_SHADER_RESOURCE, BUFFER_MODE_STRUCTURED);
     m_CubeIndexBuffer  = TexturedCube::CreateIndexBuffer(m_pDevice, BIND_SHADER_RESOURCE, BUFFER_MODE_STRUCTURED);
-    m_TextureSRV       = TexturedCube::LoadTexture(m_pDevice, "DGLogo.png")->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE);
+    m_TextureSRV       = TexturedCube::LoadTexture(m_pDevice, "T_OrangeGrid_256.png")->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE);
 
     // Set cube texture SRV in the SRB
     m_PipelineCube.pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "g_Texture")->Set(m_TextureSRV);
@@ -395,6 +397,7 @@ void KM01_VisibilityBuffer::WindowResize(Uint32 Width, Uint32 Height)
     if (m_MainVisBuf)
     {
         m_PipelineVisBufShade.pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "g_IdTexture")->Set(m_MainVisBuf->m_pIdRTV->GetTexture()->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE));
+        m_PipelineVisBufShade.pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "g_DepthTexture")->Set(m_MainVisBuf->m_pDepthDSV->GetTexture()->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE));
     }
 }
 

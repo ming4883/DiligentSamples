@@ -44,11 +44,12 @@ void main(uint3 DTid : SV_DispatchThreadID)
     TransformedNrm = mul(float4(TransformedNrm.xyz, 0), InstanceMatr);
     // Apply view-projection matrix
     float4 SvPos = mul(TransformedPos, g_Constants.ViewProj);
-    SvPos.xyz /= SvPos.www;
+    float InvW = 1.0 / SvPos.w;
+    SvPos.xy *= InvW;
     float2 OctNrm = UnitVectorToOctahedron(normalize(TransformedNrm.xyz));
     CachedMeshVertex Cached;
     Cached.PosDepthNormalUV.x = PackFloats(SvPos.x, SvPos.y);
-    Cached.PosDepthNormalUV.y = SvPos.z;
+    Cached.PosDepthNormalUV.y = InvW;
     Cached.PosDepthNormalUV.z = PackFloats(OctNrm.x, OctNrm.y);
     Cached.PosDepthNormalUV.w = PackFloats(VtxData.UV.x, VtxData.UV.y);
 
