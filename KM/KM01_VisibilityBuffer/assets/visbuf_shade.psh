@@ -50,6 +50,53 @@ float4 BaryCoord(float2 a, float2 b, float2 c, float2 p)
     return UVW;
 }
 
+// evaluate the barycentric coordinates of current, dx, and dy at once
+void BaryCoordWithDelta(float2 a, float2 b, float2 c, float2 p, float2 delta, out float4 UVW, out float4 UVW_dx, out float4 UVW_dy)
+{
+    float2 v0 = b - a, v1 = c - a, v2 = p - a;
+    /*
+    float Den = (v0.x * v1.y - v1.x * v0.y);
+    UVW[1]    = (v2.x * v1.y - v1.x * v2.y) / Den;
+    UVW[2]    = (v0.x * v2.y - v2.x * v0.y) / Den;
+    */
+    float3 Col0 = float3(v0.x, v2.x, v0.x);
+    float3 Col1 = float3(v1.y, v1.y, v2.y);
+    float3 Col2 = float3(v1.x, v1.x, v2.x);
+    float3 Col3 = float3(v0.y, v2.y, v0.y);
+
+    UVW.xyz = Col0 * Col1 - Col2 * Col3;
+
+    /*
+    float Den = (v0.x * v1.y - v1.x * v0.y);
+    UVW_dxy[1]  = ((v2.x + ox) * v1.y - v1.x * (v2.y + oy)) / Den;
+    UVW_dxy[2]  = (v0.x * (v2.y + oy) - (v2.x + ox) * v0.y) / Den;
+
+    UVW_dxy[1]  = ((v2.x * v1.y) - (v1.x * v2.y) + (ox * v1.y) - (oy * v1.x)) / Den;
+    UVW_dxy[2]  = ((v0.x * v2.y) - (v2.x * v0.y) + (oy * v0.x) - (ox * v0.y)) / Den;
+
+    UVW_dxy[1]  = (UVW[1] + (ox * v1.y) - (oy * v1.x)) / Den;
+    UVW_dxy[2]  = (UVW[2] + (oy * v0.x) - (ox * v0.y)) / Den;
+    */
+
+    UVW_dx.yz = UVW.yz + float2( delta.x * v1.y, -delta.x * v0.y);
+    UVW_dy.yz = UVW.yz + float2(-delta.y * v1.x,  delta.y * v0.x);
+
+    float InvDen = 1.0 / UVW.x;
+
+    UVW.yz    *= InvDen;
+    UVW_dx.yz *= InvDen;
+    UVW_dy.yz *= InvDen;
+
+    UVW.x = 1.0f - UVW.y - UVW.z;
+    UVW.w = (UVW.y >= 0.0 && UVW.z >= 0.0 && UVW.x >= 0.0) ? 1.0 : 0.0;
+
+    UVW_dx.x = 1.0f - UVW_dx.y - UVW_dx.z;
+    UVW_dx.w = (UVW_dx.y >= 0.0 && UVW_dx.z >= 0.0 && UVW_dx.x >= 0.0) ? 1.0 : 0.0;
+
+    UVW_dy.x = 1.0f - UVW_dy.y - UVW_dy.z;
+    UVW_dy.w = (UVW_dy.y >= 0.0 && UVW_dy.z >= 0.0 && UVW_dy.x >= 0.0) ? 1.0 : 0.0;
+}
+
 float2 SvToHPos(float2 SvPos)
 {
     float2 HPos = (SvPos.xy - 0.5) * g_Constants.ScreenSizeInvSize.zw; // normalize
@@ -114,59 +161,73 @@ void main(in  PSInput  PSIn,
         UnpackFloat(Cached[1].PosDepthNormalUV.w, Texcoord[1].x, Texcoord[1].y);
         UnpackFloat(Cached[2].PosDepthNormalUV.w, Texcoord[2].x, Texcoord[2].y);
 
+        float3 TriZ = float3(Vert[0].z, Vert[1].z, Vert[2].z);
+
         float2 HPos = SvToHPos(PSIn.Pos.xy);
 
+        /*
         float4 Bary = BaryCoord(Vert[0].xy, Vert[1].xy, Vert[2].xy, HPos);
 
-        //if (Bary.w != 0.0)
-        {
-            // perspective correct interpolation
-            float3 TriZ = float3(Vert[0].z, Vert[1].z, Vert[2].z);
-            Bary.xyz = Bary.xyz * TriZ;
-            float Denorm = 1.0 / dot(Bary.xyz, float3(1, 1, 1));
+        // perspective correct interpolation
+        Bary.xyz = Bary.xyz * TriZ;
+        float Denorm = 1.0 / dot(Bary.xyz, float3(1, 1, 1));
 
-            float2 UV = (Texcoord[0] * Bary[0] + Texcoord[1] * Bary[1] + Texcoord[2] * Bary[2]) * Denorm;
+        float2 UV = (Texcoord[0] * Bary[0] + Texcoord[1] * Bary[1] + Texcoord[2] * Bary[2]) * Denorm;
 
-            // gradient of UV and mip-mapping
-            float2 HPos_dx = HPos + g_Constants.ScreenSizeInvSize.zw * float2(2.0, 0.0); // equals to SvToHPos(PSIn.Pos.xy + float2(1, 0));
-            float2 HPos_dy = HPos + g_Constants.ScreenSizeInvSize.zw * float2(0.0,-2.0); // equals to SvToHPos(PSIn.Pos.xy + float2(0, 1));
+        // gradient of UV and mip-mapping
+        float2 HPos_dx = HPos + g_Constants.ScreenSizeInvSize.zw * float2(2.0, 0.0); // equals to SvToHPos(PSIn.Pos.xy + float2(1, 0));
+        float2 HPos_dy = HPos + g_Constants.ScreenSizeInvSize.zw * float2(0.0,-2.0); // equals to SvToHPos(PSIn.Pos.xy + float2(0, 1));
 
-            float4 Bary_dx = BaryCoord(Vert[0].xy, Vert[1].xy, Vert[2].xy, HPos_dx);
-            float4 Bary_dy = BaryCoord(Vert[0].xy, Vert[1].xy, Vert[2].xy, HPos_dy);
+        float4 Bary_dx = BaryCoord(Vert[0].xy, Vert[1].xy, Vert[2].xy, HPos_dx);
+        float4 Bary_dy = BaryCoord(Vert[0].xy, Vert[1].xy, Vert[2].xy, HPos_dy);
 
-            Bary_dx.xyz = Bary_dx.xyz * TriZ;
-            Bary_dy.xyz = Bary_dy.xyz * TriZ;
-            float Denorm_dx = 1.0 / dot(Bary_dx.xyz, float3(1, 1, 1));
-            float Denorm_dy = 1.0 / dot(Bary_dy.xyz, float3(1, 1, 1));
+        Bary_dx.xyz = Bary_dx.xyz * TriZ;
+        Bary_dy.xyz = Bary_dy.xyz * TriZ;
+        float Denorm_dx = 1.0 / dot(Bary_dx.xyz, float3(1, 1, 1));
+        float Denorm_dy = 1.0 / dot(Bary_dy.xyz, float3(1, 1, 1));
+        float2 UV_dx = (Texcoord[0] * Bary_dx[0] + Texcoord[1] * Bary_dx[1] + Texcoord[2] * Bary_dx[2]) * Denorm_dx;
+        float2 UV_dy = (Texcoord[0] * Bary_dy[0] + Texcoord[1] * Bary_dy[1] + Texcoord[2] * Bary_dy[2]) * Denorm_dy;
+        */
 
-            float2 UV_dx = (Texcoord[0] * Bary_dx[0] + Texcoord[1] * Bary_dx[1] + Texcoord[2] * Bary_dx[2]) * Denorm_dx;
-            float2 UV_dy = (Texcoord[0] * Bary_dy[0] + Texcoord[1] * Bary_dy[1] + Texcoord[2] * Bary_dy[2]) * Denorm_dy;
+        float4 Bary, Bary_dx, Bary_dy;
+        float2 HPosDelta = g_Constants.ScreenSizeInvSize.zw * float2(2.0,-2.0); // equals to SvToHPos(PSIn.Pos.xy + float2(1, 0)) and SvToHPos(PSIn.Pos.xy + float2(0, 1))
+        BaryCoordWithDelta(Vert[0].xy, Vert[1].xy, Vert[2].xy, HPos, HPosDelta, Bary, Bary_dx, Bary_dy);
 
-            float2 dUVdx = UV_dx - UV;
-            float2 dUVdy = UV_dy - UV;
+        // perspective correct interpolation
+        Bary.xyz = Bary.xyz * TriZ;
+        Bary_dx.xyz = Bary_dx.xyz * TriZ;
+        Bary_dy.xyz = Bary_dy.xyz * TriZ;
 
-            uint TexW, TexH;
-            g_Texture.GetDimensions(TexW, TexH);
+        float3 Denorm = float3(
+            dot(Bary.xyz, float3(1, 1, 1)),
+            dot(Bary_dx.xyz, float3(1, 1, 1)),
+            dot(Bary_dy.xyz, float3(1, 1, 1)));
 
-            float2 TexSize = float2((float)TexW, (float)TexH);
-            dUVdx *= TexSize;
-            dUVdy *= TexSize;
-            float MaxSqDelta = max(dot(dUVdx, dUVdx), dot(dUVdy, dUVdy));
-            float Mip = 0.5 * log2(MaxSqDelta);
+        Denorm = 1.0 / Denorm;
 
-            PSOut.Color = g_Texture.SampleLevel(g_Texture_sampler, UV, Mip);
+        float2 UV    = (Texcoord[0] * Bary[0] + Texcoord[1] * Bary[1] + Texcoord[2] * Bary[2]) * Denorm[0];
+        float2 UV_dx = (Texcoord[0] * Bary_dx[0] + Texcoord[1] * Bary_dx[1] + Texcoord[2] * Bary_dx[2]) * Denorm[1];
+        float2 UV_dy = (Texcoord[0] * Bary_dy[0] + Texcoord[1] * Bary_dy[1] + Texcoord[2] * Bary_dy[2]) * Denorm[2];
 
-            float3 Nrm = (OctahedronToUnitVector(OctNrm[0]) * Bary[0] + OctahedronToUnitVector(OctNrm[1]) * Bary[1] + OctahedronToUnitVector(OctNrm[2]) * Bary[2]) * Denorm;
-            Nrm = normalize(Nrm);
+        // gradient of UV and mip-mapping
+        float2 dUVdx = UV_dx - UV;
+        float2 dUVdy = UV_dy - UV;
 
-            float3 LightDir = float3(0, 1, 0);
-            PSOut.Color.xyz *= saturate(dot(Nrm, LightDir) * 0.75 + 0.25) + Depth * 0.00001;
-        }
-        //else
-        //{
-        //    PSOut.Color = 0;
-        //}
+        uint TexW, TexH;
+        g_Texture.GetDimensions(TexW, TexH);
 
+        float2 TexSize = float2((float)TexW, (float)TexH);
+        dUVdx *= TexSize;
+        dUVdy *= TexSize;
+        float MaxSqDelta = max(dot(dUVdx, dUVdx), dot(dUVdy, dUVdy));
+        float Mip = 0.5 * log2(MaxSqDelta);
 
+        PSOut.Color = g_Texture.SampleLevel(g_Texture_sampler, UV, Mip);
+
+        float3 Nrm = (OctahedronToUnitVector(OctNrm[0]) * Bary[0] + OctahedronToUnitVector(OctNrm[1]) * Bary[1] + OctahedronToUnitVector(OctNrm[2]) * Bary[2]) * Denorm[0];
+        Nrm = normalize(Nrm);
+
+        float3 LightDir = float3(0, 1, 0);
+        PSOut.Color.xyz *= saturate(dot(Nrm, LightDir) * 0.75 + 0.25) + Depth * 0.00001;
     }
 }

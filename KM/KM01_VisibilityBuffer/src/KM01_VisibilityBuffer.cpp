@@ -371,7 +371,7 @@ void KM01_VisibilityBuffer::Initialize(const SampleInitInfo& InitInfo)
     // Load textured cube
     m_CubeVertexBuffer = TexturedCube::CreateVertexBuffer(m_pDevice, TexturedCube::VERTEX_COMPONENT_FLAG_POS_NORM_UV, BIND_SHADER_RESOURCE, BUFFER_MODE_STRUCTURED);
     m_CubeIndexBuffer  = TexturedCube::CreateIndexBuffer(m_pDevice, BIND_SHADER_RESOURCE, BUFFER_MODE_STRUCTURED);
-    m_TextureSRV       = TexturedCube::LoadTexture(m_pDevice, "T_OrangeGrid_256.png")->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE);
+    m_TextureSRV       = TexturedCube::LoadTexture(m_pDevice, "T_RedGrid_256.png")->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE);
 
     // Set cube texture SRV in the SRB
     m_PipelineCube.pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "g_Texture")->Set(m_TextureSRV);
