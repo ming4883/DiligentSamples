@@ -94,11 +94,13 @@ private:
 
     std::shared_ptr<VisibilityBuffer>     m_MainVisBuf;
 
-    float4x4             m_ViewProjMatrix;
-    float4x4             m_RotationMatrix;
-    int                  m_GridSize   = 5;
-    static constexpr int MaxGridSize  = 32;
-    static constexpr int MaxInstances = MaxGridSize * MaxGridSize * MaxGridSize;
+    float4x4                m_ViewProjMatrix;
+    float4x4                m_ViewProjInvMatrix;
+    float4x4                m_RotationMatrix;
+    float3                  m_ViewLocation;
+    int                     m_GridSize   = 5;
+    static constexpr int    MaxGridSize  = 32;
+    static constexpr int    MaxInstances = MaxGridSize * MaxGridSize * MaxGridSize;
 };
 
 } // namespace Diligent

@@ -132,7 +132,9 @@ void KM01_VisibilityBuffer::CreateCubePSO()
     {
     {SHADER_TYPE_PIXEL, "g_Texture", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
     {SHADER_TYPE_VERTEX, "Constants", SHADER_RESOURCE_VARIABLE_TYPE_STATIC},
-    {SHADER_TYPE_VERTEX, "g_CachedVertexData", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
+    {SHADER_TYPE_VERTEX, "g_VertexData", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
+    {SHADER_TYPE_VERTEX, "g_IndexData", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
+    {SHADER_TYPE_VERTEX, "g_InstanceData", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
     };
     // clang-format on
     CubePsoCI.ShaderVars = Vars;
@@ -186,7 +188,7 @@ void KM01_VisibilityBuffer::CreateVisBufShadePSO()
     // we need to create a shader source stream factory
     RefCntAutoPtr<IShaderSourceInputStreamFactory> pShaderSourceFactory;
     m_pEngineFactory->CreateDefaultShaderSourceStreamFactory(nullptr, &pShaderSourceFactory);
-    ShaderCI.pShaderSourceStreamFactory = pShaderSourceFactory;
+    ShaderCI.pShaderSourceStreamFactory = pShaderSourceFactory ;
 
     // Create a vertex shader
     RefCntAutoPtr<IShader> pVS;
@@ -377,7 +379,9 @@ void KM01_VisibilityBuffer::Initialize(const SampleInitInfo& InitInfo)
     m_PipelineCube.pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "g_Texture")->Set(m_TextureSRV);
 
     // Set cube vertex, index and instance SRV
-    m_PipelineCube.pSRB->GetVariableByName(SHADER_TYPE_VERTEX, "g_CachedVertexData")->Set(m_VertexCacheBuffer->GetDefaultView(BUFFER_VIEW_SHADER_RESOURCE));
+    m_PipelineCube.pSRB->GetVariableByName(SHADER_TYPE_VERTEX, "g_VertexData")->Set(m_CubeVertexBuffer->GetDefaultView(BUFFER_VIEW_SHADER_RESOURCE));
+    m_PipelineCube.pSRB->GetVariableByName(SHADER_TYPE_VERTEX, "g_IndexData")->Set(m_CubeIndexBuffer->GetDefaultView(BUFFER_VIEW_SHADER_RESOURCE));
+    m_PipelineCube.pSRB->GetVariableByName(SHADER_TYPE_VERTEX, "g_InstanceData")->Set(m_InstanceBuffer->GetDefaultView(BUFFER_VIEW_SHADER_RESOURCE));
 
     m_PipelineVisBufShade.pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "g_CachedVertexData")->Set(m_VertexCacheBuffer->GetDefaultView(BUFFER_VIEW_SHADER_RESOURCE));
     m_PipelineVisBufShade.pSRB->GetVariableByName(SHADER_TYPE_PIXEL, "g_Texture")->Set(m_TextureSRV);
@@ -414,39 +418,51 @@ void KM01_VisibilityBuffer::PopulateInstanceBuffer()
     // Populate instance data buffer
     std::vector<float4x4> InstanceData(m_GridSize * m_GridSize * m_GridSize);
 
-    float fGridSize = static_cast<float>(m_GridSize);
-
-    std::mt19937 gen; // Standard mersenne_twister_engine. Use default seed
-                      // to generate consistent distribution.
-
-    std::uniform_real_distribution<float> scale_distr(0.3f, 1.0f);
-    std::uniform_real_distribution<float> offset_distr(-0.15f, +0.15f);
-    std::uniform_real_distribution<float> rot_distr(-PI_F, +PI_F);
-
-    float BaseScale = 0.6f / fGridSize;
-    int   instId    = 0;
-    for (int x = 0; x < m_GridSize; ++x)
+    if (m_GridSize > 1)
     {
-        for (int y = 0; y < m_GridSize; ++y)
+        float fGridSize = static_cast<float>(m_GridSize);
+
+        std::mt19937 gen; // Standard mersenne_twister_engine. Use default seed
+                          // to generate consistent distribution.
+
+        std::uniform_real_distribution<float> scale_distr(0.3f, 1.0f);
+        std::uniform_real_distribution<float> offset_distr(-0.15f, +0.15f);
+        std::uniform_real_distribution<float> rot_distr(-PI_F, +PI_F);
+
+        float BaseScale = 0.6f / fGridSize;
+        int   instId    = 0;
+
+        for (int x = 0; x < m_GridSize; ++x)
         {
-            for (int z = 0; z < m_GridSize; ++z)
+            for (int y = 0; y < m_GridSize; ++y)
             {
-                // Add random offset from central position in the grid
-                float xOffset = 2.f * (x + 0.5f + offset_distr(gen)) / fGridSize - 1.f;
-                float yOffset = 2.f * (y + 0.5f + offset_distr(gen)) / fGridSize - 1.f;
-                float zOffset = 2.f * (z + 0.5f + offset_distr(gen)) / fGridSize - 1.f;
-                // Random scale
-                float scale = BaseScale * scale_distr(gen);
-                // Random rotation
-                float4x4 rotation = float4x4::RotationX(rot_distr(gen)) * float4x4::RotationY(rot_distr(gen)) * float4x4::RotationZ(rot_distr(gen));
-                // Combine rotation, scale and translation
-                float4x4 matrix        = rotation * float4x4::Scale(scale, scale, scale) * float4x4::Translation(xOffset, yOffset, zOffset);
-                InstanceData[instId++] = matrix;
+                for (int z = 0; z < m_GridSize; ++z)
+                {
+                    // Add random offset from central position in the grid
+                    float xOffset = 2.f * (x + 0.5f + offset_distr(gen)) / fGridSize - 1.f;
+                    float yOffset = 2.f * (y + 0.5f + offset_distr(gen)) / fGridSize - 1.f;
+                    float zOffset = 2.f * (z + 0.5f + offset_distr(gen)) / fGridSize - 1.f;
+                    // Random scale
+                    float scale = BaseScale * scale_distr(gen);
+                    // Random rotation
+                    float4x4 rotation = float4x4::RotationX(rot_distr(gen)) * float4x4::RotationY(rot_distr(gen)) * float4x4::RotationZ(rot_distr(gen));
+                    // Combine rotation, scale and translation
+                    float4x4 matrix        = rotation * float4x4::Scale(scale, scale, scale) * float4x4::Translation(xOffset, yOffset, zOffset);
+                    //float4x4 matrix        = float4x4::Scale(scale, scale, scale) * float4x4::Translation(xOffset, yOffset, zOffset) ;
+                    InstanceData[instId++] = matrix;
+                }
             }
         }
     }
+    else
+    {
+        float scale = 0.5f;
+        // Combine rotation, scale and translation
+        float4x4 matrix   = float4x4::Scale(scale, scale, scale) * float4x4::Translation(0, 0, 0);
+        InstanceData[0] = matrix;
+    }
     // Update instance data buffer
-    Uint32 DataSize = static_cast<Uint32>(sizeof(InstanceData[0]) * InstanceData.size()) ;
+    Uint32 DataSize = static_cast<Uint32>(sizeof(InstanceData[0]) * InstanceData.size());
     m_pImmediateContext->UpdateBuffer(m_InstanceBuffer, 0, DataSize, InstanceData.data(), RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 }
 
@@ -465,22 +481,17 @@ void KM01_VisibilityBuffer::Render()
         float ScreenX = (float)m_pSwapChain->GetDesc().Width;
         float ScreenY = (float)m_pSwapChain->GetDesc().Height;
         MapHelper<GlobalConstants> CBConstants(m_pImmediateContext, m_GlobalConstants, MAP_WRITE, MAP_FLAG_DISCARD);
-        CBConstants[0].ViewProj = m_ViewProjMatrix.Transpose();
-        CBConstants[0].Rotation = m_RotationMatrix.Transpose();
-        CBConstants[0].ScreenSizeInvSize = float4(ScreenX, ScreenY, 1.0f / ScreenX, 1.0f / ScreenY);
-        CBConstants[0].MeshDrawInfo = uint4(CUBE_VERTEX_COUNT, CUBE_INSTANCE_COUNT, 0, 0) ;
+        auto& CB = CBConstants[0];
+        CB.ViewProj     = m_ViewProjMatrix.Transpose();
+        CB.ViewProjInv  = m_ViewProjInvMatrix.Transpose();
+        CB.Rotation     = m_RotationMatrix.Transpose();
+        CB.ScreenSizeInvSize = float4(ScreenX, ScreenY, 1.0f / ScreenX, 1.0f / ScreenY);
+        CB.ViewLocation = float4(m_ViewLocation.x, m_ViewLocation.y, m_ViewLocation.z, 1);
+        CB.MeshDrawInfo = uint4(CUBE_VERTEX_COUNT, CUBE_INSTANCE_COUNT, 0, 0) ;
     }
 
-    // Update Vertex Cache
-    {
-        DispatchComputeAttribs DispatAttribs;
-        DispatAttribs.ThreadGroupCountX = DivideAndRoundUp<uint32_t>(CUBE_TOTAL_VERTEX_COUNT, DISPATCH_THREAD_GROUP_SIZE);
 
-        m_pImmediateContext->SetPipelineState(m_PipelineVisBufVertexCache.pPSO);
-        m_pImmediateContext->CommitShaderResources(m_PipelineVisBufVertexCache.pSRB, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-        m_pImmediateContext->DispatchCompute(DispatAttribs);
-    }
-
+    // Rasterize Visibility buffer
     {
         auto pRTV = m_MainVisBuf->m_pIdRTV;
         auto pDSV = m_MainVisBuf->m_pDepthDSV;
@@ -509,6 +520,17 @@ void KM01_VisibilityBuffer::Render()
         m_pImmediateContext->Draw(DrawAttrs);
     }
 
+    // Update Vertex Cache
+    {
+        DispatchComputeAttribs DispatAttribs;
+        DispatAttribs.ThreadGroupCountX = DivideAndRoundUp<uint32_t>(CUBE_TOTAL_VERTEX_COUNT, DISPATCH_THREAD_GROUP_SIZE);
+
+        m_pImmediateContext->SetPipelineState(m_PipelineVisBufVertexCache.pPSO);
+        m_pImmediateContext->CommitShaderResources(m_PipelineVisBufVertexCache.pSRB, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+        m_pImmediateContext->DispatchCompute(DispatAttribs);
+    }
+
+    // Shade with Visibility Buffer
     {
         auto pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
         // Clear the default render target
@@ -528,7 +550,6 @@ void KM01_VisibilityBuffer::Render()
         RTDrawAttrs.Flags       = DRAW_FLAG_VERIFY_ALL; // Verify the state of vertex and index buffers
         m_pImmediateContext->Draw(RTDrawAttrs);
     }
-
 }
 
 void KM01_VisibilityBuffer::Update(double CurrTime, double ElapsedTime)
@@ -537,16 +558,18 @@ void KM01_VisibilityBuffer::Update(double CurrTime, double ElapsedTime)
     UpdateUI();
 
     // Set cube view matrix
-    float4x4 View = float4x4::RotationX(-0.6f) * float4x4::Translation(0.f, 0.f, 4.0f);
+    m_ViewLocation = float3(0, 0, -4);
+    float4x4 View = float4x4::RotationX(0.0f) * float4x4::Translation(-m_ViewLocation);
 
     // Get pretransform matrix that rotates the scene according the surface orientation
     auto SrfPreTransform = GetSurfacePretransformMatrix(float3{0, 0, 1});
 
     // Get projection matrix adjusted to the current screen orientation
-    auto Proj = GetAdjustedProjectionMatrix(PI_F / 4.0f, 0.1f, 100.f);
+    auto Proj = GetAdjustedProjectionMatrix(PI_F / 4.0f, 1.0f, 10.f);
 
     // Compute view-projection matrix
     m_ViewProjMatrix = View * SrfPreTransform * Proj;
+    m_ViewProjInvMatrix = m_ViewProjMatrix.Inverse();
 
     // Global rotation matrix
     const auto AnimTime = CurrTime * 0.125;

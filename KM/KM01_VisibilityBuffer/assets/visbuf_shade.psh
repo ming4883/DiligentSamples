@@ -128,8 +128,6 @@ void main(in  PSInput  PSIn,
     }
     else
     {
-        float Depth = g_DepthTexture.Sample(g_DepthTexture_sampler, IdTexUV).r;
-
         uint InstId   = (PrimId >> 16) & 0xffff;
         uint TriId   = PrimId & 0xffff;
 
@@ -141,7 +139,7 @@ void main(in  PSInput  PSIn,
         Cached[2] = g_CachedVertexData[BufferOffset+2];
 
         float3 Vert[3];
-        float2 OctNrm[3];
+        float3 VertNrm[3];
         float2 Texcoord[3];
 
         // unpack SvPos
@@ -153,9 +151,9 @@ void main(in  PSInput  PSIn,
         Vert[1].z = Cached[1].PosDepthNormalUV.y;
         Vert[2].z = Cached[2].PosDepthNormalUV.y;
 
-        UnpackFloat(Cached[0].PosDepthNormalUV.z, OctNrm[0].x, OctNrm[0].y);
-        UnpackFloat(Cached[1].PosDepthNormalUV.z, OctNrm[1].x, OctNrm[1].y);
-        UnpackFloat(Cached[2].PosDepthNormalUV.z, OctNrm[2].x, OctNrm[2].y);
+        VertNrm[0] = DecodeNormal(Cached[0].PosDepthNormalUV.z);
+        VertNrm[1] = DecodeNormal(Cached[1].PosDepthNormalUV.z);
+        VertNrm[2] = DecodeNormal(Cached[2].PosDepthNormalUV.z);
 
         UnpackFloat(Cached[0].PosDepthNormalUV.w, Texcoord[0].x, Texcoord[0].y);
         UnpackFloat(Cached[1].PosDepthNormalUV.w, Texcoord[1].x, Texcoord[1].y);
@@ -198,16 +196,14 @@ void main(in  PSInput  PSIn,
         Bary_dx.xyz = Bary_dx.xyz * TriZ;
         Bary_dy.xyz = Bary_dy.xyz * TriZ;
 
-        float3 Denorm = float3(
-            dot(Bary.xyz, float3(1, 1, 1)),
-            dot(Bary_dx.xyz, float3(1, 1, 1)),
-            dot(Bary_dy.xyz, float3(1, 1, 1)));
+        Bary    /= dot(Bary.xyz, float3(1, 1, 1));
+        Bary_dx /= dot(Bary_dx.xyz, float3(1, 1, 1));
+        Bary_dy /= dot(Bary_dy.xyz, float3(1, 1, 1));
 
-        Denorm = 1.0 / Denorm;
 
-        float2 UV    = (Texcoord[0] * Bary[0] + Texcoord[1] * Bary[1] + Texcoord[2] * Bary[2]) * Denorm[0];
-        float2 UV_dx = (Texcoord[0] * Bary_dx[0] + Texcoord[1] * Bary_dx[1] + Texcoord[2] * Bary_dx[2]) * Denorm[1];
-        float2 UV_dy = (Texcoord[0] * Bary_dy[0] + Texcoord[1] * Bary_dy[1] + Texcoord[2] * Bary_dy[2]) * Denorm[2];
+        float2 UV    = (Texcoord[0] * Bary[0] + Texcoord[1] * Bary[1] + Texcoord[2] * Bary[2]);
+        float2 UV_dx = (Texcoord[0] * Bary_dx[0] + Texcoord[1] * Bary_dx[1] + Texcoord[2] * Bary_dx[2]);
+        float2 UV_dy = (Texcoord[0] * Bary_dy[0] + Texcoord[1] * Bary_dy[1] + Texcoord[2] * Bary_dy[2]);
 
         // gradient of UV and mip-mapping
         float2 dUVdx = UV_dx - UV;
@@ -224,10 +220,18 @@ void main(in  PSInput  PSIn,
 
         PSOut.Color = g_Texture.SampleLevel(g_Texture_sampler, UV, Mip);
 
-        float3 Nrm = (OctahedronToUnitVector(OctNrm[0]) * Bary[0] + OctahedronToUnitVector(OctNrm[1]) * Bary[1] + OctahedronToUnitVector(OctNrm[2]) * Bary[2]) * Denorm[0];
+        float3 Nrm = (VertNrm[0] * Bary[0] + VertNrm[1] * Bary[1] + VertNrm[2] * Bary[2]);
         Nrm = normalize(Nrm);
 
+        float Depth = g_DepthTexture.Sample(g_DepthTexture_sampler, IdTexUV).r;
+
+        float4 WorldPos = mul(float4(HPos, Depth, 1.0), g_Constants.ViewProjInv);
+        WorldPos.xyz /= WorldPos.w;
+
+        float3 ToViewDir = (g_Constants.ViewLocation.xyz - WorldPos.xyz);
+
         float3 LightDir = float3(0, 1, 0);
-        PSOut.Color.xyz *= saturate(dot(Nrm, LightDir) * 0.75 + 0.25) + Depth * 0.00001;
+        PSOut.Color.xyz *= saturate(dot(Nrm, normalize(ToViewDir)));
+        //PSOut.Color.xyz = saturate(Nrm) * smoothstep(0, 1, length(ToViewDir));
     }
 }

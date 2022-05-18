@@ -44,3 +44,22 @@ float3 OctahedronToUnitVector( float2 Oct )
 	}
 	return normalize(N);
 }
+
+float EncodeNormal( float3 RawNormal )
+{
+	RawNormal = (RawNormal * 0.5 + 0.5) * 255.0;
+
+    uint3 IntNrm = (uint3)floor(RawNormal);
+    return asfloat((IntNrm.b << 16) | (IntNrm.g << 8) | IntNrm.r);
+}
+
+float3 DecodeNormal( float EncodedNormal )
+{
+	uint Bits = asuint(EncodedNormal);
+	uint X = Bits & 0xff;
+	uint Y = (Bits >> 8) & 0xff;
+	uint Z = (Bits >> 16) & 0xff;
+
+	float3 N = float3((float)X, (float)Y, (float)Z) / 255.0;
+	return normalize(N * 2.0 - 1.0);
+}

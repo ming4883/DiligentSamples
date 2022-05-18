@@ -39,7 +39,9 @@ struct CachedMeshVertex
 struct GlobalConstants
 {
     float4x4    ViewProj;
+    float4x4    ViewProjInv;
     float4x4    Rotation;
     float4      ScreenSizeInvSize;
+    float4      ViewLocation;
     uint4       MeshDrawInfo; // vertex count, instance count, padding, padding
 };
